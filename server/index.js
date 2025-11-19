@@ -1,24 +1,19 @@
-/*
- * NOTE: This is the reference implementation for the Backend API.
- * In this browser sandbox environment, the React application uses 
- * services/api.ts to mock these endpoints directly.
- * 
- * To run this server locally:
- * 1. npm install express cors jsonwebtoken body-parser
- * 2. node server/index.js
- */
-
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const bodyParser = require('body-parser');
+const path = require('path');
 
 const app = express();
-const PORT = 3001;
-const SECRET_KEY = 'your-secret-key';
+// Use the port provided by the cloud environment or default to 3001
+const PORT = process.env.PORT || 3001;
+const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-in-prod';
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
+
+// --- Serve Static Frontend ---
+// This allows the Node.js server to serve the React app structure
+app.use(express.static(path.join(__dirname, '../dist')));
 
 // --- Middleware ---
 const authenticateToken = (req, res, next) => {
@@ -49,9 +44,12 @@ const projects = [
     { id: 'p1', name: 'Sunrise Towers', city: 'New York', status: 'Construction' }
 ];
 
-// --- Routes ---
+// --- API Routes ---
 
-// Auth
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', port: PORT });
+});
+
 app.post('/auth/login', (req, res) => {
     const { email, password } = req.body;
     const user = users.find(u => u.email === email && u.password === password);
@@ -65,7 +63,6 @@ app.post('/auth/login', (req, res) => {
     }
 });
 
-// Projects
 app.get('/api/projects', authenticateToken, (req, res) => {
     res.json(projects);
 });
@@ -76,12 +73,17 @@ app.post('/api/projects', authenticateToken, requireAdmin, (req, res) => {
     res.json(newProject);
 });
 
-// Users (Admin only)
 app.get('/api/users', authenticateToken, requireAdmin, (req, res) => {
     res.json(users.map(({password, ...u}) => u));
 });
 
-// Start
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+// --- Catch-all for React Router ---
+// Any request not handled by API or static files returns index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
+// --- Start Server ---
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
 });
