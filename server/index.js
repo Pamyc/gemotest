@@ -2,9 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-// Use the port provided by the cloud environment or default to 3001
 const PORT = process.env.PORT || 3001;
 const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-in-prod';
 
@@ -12,8 +12,17 @@ app.use(cors());
 app.use(express.json());
 
 // --- Serve Static Frontend ---
-// This allows the Node.js server to serve the React app structure
-app.use(express.static(path.join(__dirname, '../dist')));
+// Resolve the path to the dist folder relative to this file
+const DIST_DIR = path.join(__dirname, '../dist');
+
+console.log('Starting server...');
+console.log('Serving static files from:', DIST_DIR);
+
+if (fs.existsSync(DIST_DIR)) {
+    app.use(express.static(DIST_DIR));
+} else {
+    console.error('WARNING: dist folder not found! Run "npm run build" first.');
+}
 
 // --- Middleware ---
 const authenticateToken = (req, res, next) => {
@@ -78,9 +87,13 @@ app.get('/api/users', authenticateToken, requireAdmin, (req, res) => {
 });
 
 // --- Catch-all for React Router ---
-// Any request not handled by API or static files returns index.html
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../dist/index.html'));
+  const indexPath = path.join(DIST_DIR, 'index.html');
+  if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+  } else {
+      res.status(404).send('App is building or index.html is missing. Please check logs.');
+  }
 });
 
 // --- Start Server ---
